@@ -8,10 +8,18 @@ import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
+import android.media.AudioFormat;
+import android.media.AudioRecord;
+import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Environment;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.Message;
 import android.os.PersistableBundle;
+import android.os.Process;
 import android.text.TextUtils;
+import android.util.Log;
 import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
@@ -239,6 +247,7 @@ public class DoodleActivity extends Activity {
 
             @Override
             public void onReady(IDoodle doodle) {
+                Log.d("MyDoodleView", "Now operating onReady");
                 mEditSizeSeekBar.setMax(Math.min(mDoodleView.getWidth(), mDoodleView.getHeight()));
 
                 float size = mDoodleParams.mPaintUnitSize > 0 ? mDoodleParams.mPaintUnitSize * mDoodle.getUnitSize() : 0;
@@ -251,13 +260,14 @@ public class DoodleActivity extends Activity {
                 mDoodle.setPen(DoodlePen.BRUSH);
                 mDoodle.setShape(DoodleShape.HAND_WRITE);
                 mDoodle.setColor(new DoodleColor(mDoodleParams.mPaintColor));
+
                 if (mDoodleParams.mZoomerScale <= 0) {
                     findViewById(R.id.btn_zoomer).setVisibility(View.GONE);
                 }
                 mDoodle.setZoomerScale(mDoodleParams.mZoomerScale);
                 mTouchGestureListener.setSupportScaleItem(mDoodleParams.mSupportScaleItem);
 
-                // 每个画笔的初始值
+                // 每个画笔的初值 -> size
                 mPenSizeMap.put(DoodlePen.BRUSH, mDoodle.getSize());
                 mPenSizeMap.put(DoodlePen.MOSAIC, DEFAULT_MOSAIC_SIZE * mDoodle.getUnitSize());
                 mPenSizeMap.put(DoodlePen.COPY, DEFAULT_COPY_SIZE * mDoodle.getUnitSize());
@@ -273,13 +283,13 @@ public class DoodleActivity extends Activity {
             IDoodleColor mLastColor = null;
             Float mSize = null;
 
-            IDoodleItemListener mIDoodleItemListener = new IDoodleItemListener() {
+            IDoodleItemListener mIDoodleItemListener = new IDoodleItemListener() {  // 监听property scale的内容
                 @Override
                 public void onPropertyChanged(int property) {
                     if (mTouchGestureListener.getSelectedItem() == null) {
                         return;
                     }
-                    if (property == IDoodleItemListener.PROPERTY_SCALE) {
+                    if (property == IDoodleItemListener.PROPERTY_SCALE) {           // 这一部分设置显示的brush大小
                         mItemScaleTextView.setText(
                                 (int) (mTouchGestureListener.getSelectedItem().getScale() * 100 + 0.5f) + "%");
                     }
@@ -287,7 +297,7 @@ public class DoodleActivity extends Activity {
             };
 
             @Override
-            public void onSelectedItem(IDoodle doodle, IDoodleSelectableItem selectableItem, boolean selected) {
+            public void onSelectedItem(IDoodle doodle, IDoodleSelectableItem selectableItem, boolean selected) {    // 编辑模式的时候，调整图形的相关性质；
                 if (selected) {
                     if (mLastPen == null) {
                         mLastPen = mDoodle.getPen();
@@ -357,6 +367,8 @@ public class DoodleActivity extends Activity {
         mDoodle.setDoodleMaxScale(mDoodleParams.mMaxScale);
 
         initView();
+
+        startRecord();
     }
 
     private boolean canChangeColor(IDoodlePen pen) {
@@ -554,6 +566,8 @@ public class DoodleActivity extends Activity {
                 showView(mSettingsPanel);
             }
         };
+
+        // mathView = findViewById(R.id.mymathview);
     }
 
     private ValueAnimator mRotateAnimator;
@@ -760,6 +774,137 @@ public class DoodleActivity extends Activity {
         view.clearAnimation();
         view.startAnimation(mViewHideAnimation);
         view.setVisibility(View.GONE);
+    }
+
+    private static final int SAMPLE_RATE = 16000;
+    private static final int BUFFER_SIZE = 640;
+    public AudioRecord audioRecord;
+    private Thread recordThread;
+    public MathView mathView;
+
+    private int mAudioSampleRate = SAMPLE_RATE;
+    private int mAudioSource = MediaRecorder.AudioSource.MIC;
+    private int mAudioFormat = AudioFormat.ENCODING_PCM_16BIT;
+    private int mAudioChannel = AudioFormat.CHANNEL_IN_MONO;
+
+    private volatile boolean isQueryLog;
+    private volatile boolean isStartRecord = false;
+
+    public void startRecord() {
+
+        stopRecord();
+
+        if (recordThread != null) {
+            try {
+                recordThread.join();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+
+        android.os.Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
+
+        final int buffersize = audioRecord.getMinBufferSize(mAudioSampleRate, mAudioChannel, mAudioFormat);
+
+        try {
+            audioRecord = new AudioRecord(mAudioSource, mAudioSampleRate, mAudioChannel, mAudioFormat, buffersize * 10);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        // start recording
+
+        isStartRecord = true;
+
+        recordThread = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                Looper.prepare();
+                isStartRecord = true;
+                try {
+                    if (audioRecord != null) {
+                        audioRecord.startRecording();
+                    }
+                } catch (IllegalStateException e) {
+                    e.printStackTrace();
+                    isStartRecord = false;
+                }
+                isQueryLog = true;
+                while (isStartRecord) {
+                    try {
+                        byte[] buffer = new byte[BUFFER_SIZE];
+                        int readBytes = audioRecord.read(buffer, 0, buffer.length);
+                        if (readBytes > 0) {
+                            ProcessData(buffer);
+                            Message msg = new Message();
+                            msg.obj = buffer;
+                            handler.sendMessage(msg);
+                        }
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        isStartRecord = false;
+                    }
+                }
+
+                try {
+                    if (audioRecord != null) {
+                        Log.d("MainActivity","audio released");
+                        audioRecord.release();
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    audioRecord = null;
+                }
+
+            }
+        };
+
+        recordThread.start();
+    }
+
+    public void stopRecord() {
+        isStartRecord = false;
+    }
+
+    public void ProcessData(byte[] data) {
+
+    }
+
+    public byte[] mainBuffer;
+
+    Handler handler = new Handler() {
+        public void handleMessage(Message msg) {
+            byte[] displaydata = new byte[8];
+            byte[] data = (byte[])(msg.obj);
+            for(int i=0;i<8;i++)
+                displaydata[i] = data[i];
+            mainBuffer = data;
+            DrawData(data);
+        }
+    };
+
+    public byte[] getMainBuffer() {
+        return mainBuffer;
+    }
+
+    public void DrawData(byte[] data) {
+        // mathView.setData(data);
+        // DisplayAudio(data);
+    }
+
+    public void ChangedParams() {
+
+    }
+
+    public void DisplayAudio(byte[] data) {
+        String s = "Displayed data: ";
+        for(int i=0;i<data.length && i<10;i++) {
+            s = s + data[i];
+        }
+        Log.d("AudioData", s);
+        return;
     }
 
     /**
