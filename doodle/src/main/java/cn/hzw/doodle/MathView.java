@@ -7,7 +7,6 @@ import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Picture;
 import android.graphics.Point;
-import android.support.annotation.Nullable;
 import android.util.AttributeSet;
 import android.view.View;
 
@@ -23,7 +22,7 @@ public class MathView extends View {
         this(context,null);
     }
 
-    public MathView(Context context, @Nullable AttributeSet attrs) {
+    public MathView(Context context, AttributeSet attrs) {
         super(context, attrs);
         init();
     }

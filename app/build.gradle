@@ -26,6 +26,8 @@ dependencies {
         transitive = false
     }
 
+    implementation files ('C:/Program Files/Java/jdk1.8.0_221/jre/lib/rt.jar')
+
 /*    // test
     debugImplementation 'com.squareup.leakcanary:leakcanary-android:1.6.2'
     releaseImplementation 'com.squareup.leakcanary:leakcanary-android-no-op:1.6.2'
