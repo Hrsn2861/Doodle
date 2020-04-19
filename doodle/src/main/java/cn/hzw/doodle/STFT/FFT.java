@@ -1,5 +1,7 @@
 package cn.hzw.doodle.STFT;
 
+import android.util.Log;
+
 public class FFT {
 
     /**
@@ -14,7 +16,9 @@ public class FFT {
         if (N == 1) return new Complex[] { x[0] };
 
         // radix 2 Cooley-Tukey FFT
-        if (N%2 != 0) { throw new RuntimeException("N is not a power of 2"); }
+        if (N%2 != 0) {
+            throw new RuntimeException("N is not a power of 2");
+        }
 
         // fft of even terms
         Complex[] even = new Complex[N/2];
@@ -42,9 +46,15 @@ public class FFT {
     }
 
     public Complex[] rfft(Complex[] x, int NFFT) {
-        Complex[] trunc = new Complex[NFFT];
+        if(NFFT != 254) {
+            throw new RuntimeException("nfft is not 254");          // 针对于NFFT是254的情况
+        }
+        int LENGTH = 256;
+        Complex[] trunc = new Complex[LENGTH];
+        trunc[0] = new Complex(0, 0);
+        trunc[255] = new Complex(0, 0);
         for(int i=0;i<NFFT;i++) {
-            trunc[i] = x[i];
+            trunc[i+1] = new Complex(x[i].re(), x[i].im());
         }
         Complex[] res = this.fft(trunc);
         Complex[] ret = new Complex[NFFT/2+1];
@@ -52,7 +62,7 @@ public class FFT {
         assert res.length == NFFT;
 
         for(int i=0;i<NFFT/2+1;i++) {
-            ret[i] = res[i];
+            ret[i] = res[i+1];
         }
 
         return ret;

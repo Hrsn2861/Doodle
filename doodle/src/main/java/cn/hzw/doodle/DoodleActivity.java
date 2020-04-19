@@ -35,7 +35,10 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -780,14 +783,14 @@ public class DoodleActivity extends Activity {
     }
 
     private static final int SAMPLE_RATE = 16000;
-    private static final int BUFFER_SIZE = 640;
+    private static final int BUFFER_SIZE = 800;
     public AudioRecord audioRecord;
     private Thread recordThread;
     public MathView mathView;
 
     private int mAudioSampleRate = SAMPLE_RATE;
     private int mAudioSource = MediaRecorder.AudioSource.MIC;
-    private int mAudioFormat = AudioFormat.ENCODING_PCM_16BIT;
+    private int mAudioFormat = AudioFormat.ENCODING_PCM_FLOAT;
     private int mAudioChannel = AudioFormat.CHANNEL_IN_MONO;
 
     private volatile boolean isQueryLog;
@@ -840,10 +843,8 @@ public class DoodleActivity extends Activity {
                         float[] buffer = new float[BUFFER_SIZE];
                         int readBytes = audioRecord.read(buffer, 0, buffer.length, AudioRecord.READ_NON_BLOCKING);
                         if (readBytes > 0) {
+                            Log.e("----------", "Somthing recorded here");
                             ProcessData(buffer);
-                            Message msg = new Message();
-                            msg.obj = buffer;
-                            handler.sendMessage(msg);
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -868,49 +869,20 @@ public class DoodleActivity extends Activity {
         recordThread.start();
     }
 
-    STFT stft;
+    STFT stft = new STFT();
 
     public void stopRecord() {
         isStartRecord = false;
     }
 
     public void ProcessData(float[] data) {
-
-    }
-
-    public byte[] mainBuffer;
-
-    Handler handler = new Handler() {
-        public void handleMessage(Message msg) {
-            byte[] displaydata = new byte[8];
-            byte[] data = (byte[])(msg.obj);
-            for(int i=0;i<8;i++)
-                displaydata[i] = data[i];
-            mainBuffer = data;
-            DrawData(data);
+        String s = "";
+        for(int i=0;i<data.length;i++) {
+            s += data[i] + ", ";
         }
-    };
-
-    public byte[] getMainBuffer() {
-        return mainBuffer;
-    }
-
-    public void DrawData(byte[] data) {
-        // mathView.setData(data);
-        // DisplayAudio(data);
-    }
-
-    public void ChangedParams() {
-
-    }
-
-    public void DisplayAudio(byte[] data) {
-        String s = "Displayed data: ";
-        for(int i=0;i<data.length && i<10;i++) {
-            s = s + data[i];
-        }
-        Log.d("AudioData", s);
-        return;
+        Log.e("------------", s);
+        double frameSize = 0.025;
+        stft.performStft(data, SAMPLE_RATE, frameSize, 0.01, 254, true);
     }
 
     /**

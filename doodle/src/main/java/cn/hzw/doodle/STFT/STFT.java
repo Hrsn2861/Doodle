@@ -1,5 +1,7 @@
 package cn.hzw.doodle.STFT;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -15,7 +17,7 @@ public class STFT {
 
     float framedSignal[][];         // 切分之后的framedSignal
     ArrayList<ArrayList<Complex>> magnitude;            // rfft 之后得到的幅度值
-    ArrayList<ArrayList<Double>> xdb;                   // 计算 amplitude_to_db 的结果
+    double[][] xdb;                   // 计算 amplitude_to_db 的结果
 
     void addWinfun() {
         for(int i=0;i<framedSignal.length;i++) {
@@ -23,7 +25,7 @@ public class STFT {
         }
     }
 
-    public ArrayList performStft(float[] signal, int sampleRate, double frameSize, double frameStride, int NFFT, boolean normalized) {
+    public double[][] performStft(float[] signal, int sampleRate, double frameSize, double frameStride, int NFFT, boolean normalized) {
         int frameLength = (int)Math.round(frameSize *  sampleRate);
         int frameStep = (int)Math.round(frameStride * sampleRate);
         int signalLength = signal.length;
@@ -38,7 +40,7 @@ public class STFT {
 
         for(int i=0;i<numFrames;i++) {
             for(int j=0;j<frameLength;j++) {
-                framedSignal[i][j] = signal[frameStep * numFrames + j];
+                framedSignal[i][j] = padSignal[frameStep * numFrames + j];
             }
         }
 
@@ -51,93 +53,87 @@ public class STFT {
         assert magnitude.size() == numFrames;
         assert magnitude.get(0).size() == (NFFT / 2 - 1);
 
-        calculateFeature3(normalized);
-        return magnitude;
+        return calculateFeature3(normalized);
     }
 
     double AverageXdb() {
         double ret = 0;
-        int len = xdb.size() * xdb.get(0).size();
-        for(int i=0;i<xdb.size();i++) {
-            for(int j=0;j<xdb.get(i).size();j++) {
-                ret += xdb.get(i).get(j);
+        for(int i=0;i<xdb.length;i++) {
+            for(int j=0;j<xdb[i].length;j++) {
+                ret += xdb[i][j];
             }
         }
         return ret;
     }
 
     double StdVariantXdb() {
-        int len = xdb.size() * xdb.get(0).size();
+        int len = xdb.length * xdb[0].length;
         double avg = AverageXdb();
         double dVar = 0;
-        for(int i=0;i<xdb.size();i++) {
-            for(int j=0;j<xdb.get(i).size();j++) {
-                double xi = xdb.get(i).get(j);
+        for(int i=0;i<xdb.length;i++) {
+            for(int j=0;j<xdb[i].length;j++) {
+                double xi = xdb[i][j];
                 dVar += (xi - avg) * (xi - avg);
             }
         }
         return Math.sqrt(dVar/len);
     }
 
-    ArrayList calculateFeature3(boolean normalized) {
-        xdb = new ArrayList<>(amplitude_to_db());      // Matrix
+    public double[][] calculateFeature3(boolean normalized) {
+        amplitude_to_db();      // Matrix
         double avg = AverageXdb();
         double std = StdVariantXdb();
         if(normalized) {
-            for(int i=0;i<xdb.size();i++) {
-                for (int j=0;i<xdb.get(j).size();j++) {
-                    double xi = (xdb.get(i).get(j) - avg) / std;
-                    xdb.get(i).set(j, xi);
+            for(int i=0;i<xdb.length;i++) {
+                for (int j=0;j<xdb[i].length;j++) {
+                    double xi = (xdb[i][j] - avg) / std;
+                    xdb[i][j] = xi;
                 }
             }
         }
-        ArrayList<ArrayList<Double>> ret = new ArrayList<>();
+        double[][] ret = new double[xdb[0].length][xdb.length];
         // transpose
-        for(int i=0;i<xdb.get(0).size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
-            for(int j=0;j<xdb.size();j++) {
-                buffer.add(xdb.get(j).get(i));
+        for(int i=0;i<xdb[0].length;i++) {
+            for(int j=0;j<xdb.length;j++) {
+                ret[i][j] = xdb[j][i];
             }
-            ret.add(new ArrayList<Double>(buffer));
         }
 
         return ret;
     }
 
-    ArrayList amplitude_to_db() {
+    void amplitude_to_db() {
         double amin = 1E-10;
         double topDb = 80.0;
 
-        ArrayList<ArrayList<Double>> squareMagnitude = new ArrayList<>();
+        xdb = new double[magnitude.size()][magnitude.get(0).size()];
+
+        double[][] squareMagnitude = new double[magnitude.size()][magnitude.get(0).size()];
 
         for(int i=0;i<magnitude.size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
             for(int j=0;j<magnitude.get(0).size();j++) {
-                buffer.add(magnitude.get(i).get(i).square());
+                squareMagnitude[i][j] = magnitude.get(i).get(j).square();
             }
-            squareMagnitude.add(new ArrayList<Double>(buffer));
         }
 
-        ArrayList<ArrayList<Double>> logSpec = new ArrayList<>();
+        double[][] logSpec = new double[magnitude.size()][magnitude.get(0).size()];
         double maxSpec = 0;
         for(int i=0;i<magnitude.size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
             for(int j=0;j<magnitude.get(0).size();j++) {
-                double d = 10 * Math.log10(Math.max(amin, squareMagnitude.get(i).get(j)));
-                d -= 10 * Math.log10(Math.max(amin, squareMagnitude.get(i).get(j)));
-                buffer.add(d);
+                double d = 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
+                d -= 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
+                logSpec[i][j] = d;
                 maxSpec = Math.max(maxSpec, d);
             }
-            logSpec.add(new ArrayList<Double>(buffer));
         }
 
         for(int i=0;i<magnitude.size();i++) {
             for(int j=0;j>magnitude.get(0).size();j++) {
-                logSpec.get(i).set(j, Math.max(logSpec.get(i).get(j), maxSpec - topDb));
+                logSpec[i][j] = Math.max(logSpec[i][j], maxSpec - topDb);
             }
         }
 
-        return logSpec;
+        xdb = logSpec;
     }
 
     /**
