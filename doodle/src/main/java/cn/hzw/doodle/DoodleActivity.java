@@ -4,6 +4,8 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
+import android.content.res.AssetFileDescriptor;
+import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
@@ -33,7 +35,11 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -53,6 +59,7 @@ import cn.hzw.doodle.core.IDoodleTouchDetector;
 import cn.hzw.doodle.dialog.ColorPickerDialog;
 import cn.hzw.doodle.dialog.DialogController;
 import cn.hzw.doodle.imagepicker.ImageSelectorView;
+import org.tensorflow.lite.Interpreter;
 
 /**
  * 涂鸦界面，根据DoodleView的接口，提供页面交互
@@ -869,6 +876,10 @@ public class DoodleActivity extends Activity {
     }
 
     public void ProcessData(byte[] data) {
+        if (tfLite == null) {
+            loadModel();
+        }
+        DisplayAudio(data);
 
     }
 
@@ -884,6 +895,26 @@ public class DoodleActivity extends Activity {
             DrawData(data);
         }
     };
+
+    private static final String MODEL_FILENAME = "file:///android_asset/android.tflite";
+    private static MappedByteBuffer loadModelFile(AssetManager assets, String modelFilename)
+            throws IOException {
+        AssetFileDescriptor fileDescriptor = assets.openFd(modelFilename);
+        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
+        FileChannel fileChannel = inputStream.getChannel();
+        long startOffset = fileDescriptor.getStartOffset();
+        long declaredLength = fileDescriptor.getDeclaredLength();
+        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
+    }
+    Interpreter tfLite = null;
+    public void loadModel() {
+        String actualModelFilename = MODEL_FILENAME.split("file:///android_asset/", -1)[1];
+        try {
+            tfLite = new Interpreter(loadModelFile(getAssets(), actualModelFilename));
+        } catch (Exception e) {
+            throw new RuntimeException(e);
+        }
+    }
 
     public byte[] getMainBuffer() {
         return mainBuffer;
@@ -901,7 +932,7 @@ public class DoodleActivity extends Activity {
     public void DisplayAudio(byte[] data) {
         String s = "Displayed data: ";
         for(int i=0;i<data.length && i<10;i++) {
-            s = s + data[i];
+            s = s + " " + data[i];
         }
         Log.d("AudioData", s);
         return;
