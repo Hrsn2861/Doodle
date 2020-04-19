@@ -843,7 +843,6 @@ public class DoodleActivity extends Activity {
                         float[] buffer = new float[BUFFER_SIZE];
                         int readBytes = audioRecord.read(buffer, 0, buffer.length, AudioRecord.READ_NON_BLOCKING);
                         if (readBytes > 0) {
-                            Log.e("----------", "Somthing recorded here");
                             ProcessData(buffer);
                         }
                     } catch (Exception e) {
@@ -880,7 +879,6 @@ public class DoodleActivity extends Activity {
         for(int i=0;i<data.length;i++) {
             s += data[i] + ", ";
         }
-        Log.e("------------", s);
         double frameSize = 0.025;
         stft.performStft(data, SAMPLE_RATE, frameSize, 0.01, 254, true);
     }
