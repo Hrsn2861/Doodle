@@ -18,6 +18,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PersistableBundle;
 import android.os.Process;
+import android.support.annotation.RequiresApi;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -43,6 +44,7 @@ import cn.forward.androids.utils.ImageUtils;
 import cn.forward.androids.utils.LogUtil;
 import cn.forward.androids.utils.StatusBarUtil;
 import cn.forward.androids.utils.Util;
+import cn.hzw.doodle.STFT.STFT;
 import cn.hzw.doodle.core.IDoodle;
 import cn.hzw.doodle.core.IDoodleColor;
 import cn.hzw.doodle.core.IDoodleItemListener;
@@ -159,6 +161,7 @@ public class DoodleActivity extends Activity {
     }
 
     @Override
+    @RequiresApi(23)
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         StatusBarUtil.setStatusBarTranslucent(this, true, false);
@@ -790,6 +793,7 @@ public class DoodleActivity extends Activity {
     private volatile boolean isQueryLog;
     private volatile boolean isStartRecord = false;
 
+    @RequiresApi(23)
     public void startRecord() {
 
         stopRecord();
@@ -833,8 +837,8 @@ public class DoodleActivity extends Activity {
                 isQueryLog = true;
                 while (isStartRecord) {
                     try {
-                        byte[] buffer = new byte[BUFFER_SIZE];
-                        int readBytes = audioRecord.read(buffer, 0, buffer.length);
+                        float[] buffer = new float[BUFFER_SIZE];
+                        int readBytes = audioRecord.read(buffer, 0, buffer.length, AudioRecord.READ_NON_BLOCKING);
                         if (readBytes > 0) {
                             ProcessData(buffer);
                             Message msg = new Message();
@@ -864,11 +868,13 @@ public class DoodleActivity extends Activity {
         recordThread.start();
     }
 
+    STFT stft;
+
     public void stopRecord() {
         isStartRecord = false;
     }
 
-    public void ProcessData(byte[] data) {
+    public void ProcessData(float[] data) {
 
     }
 

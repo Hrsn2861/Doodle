@@ -13,11 +13,9 @@ import java.util.LinkedHashMap;
  */
 public class STFT {
 
-    public LinkedHashMap<Double,Double> freqMagn= new LinkedHashMap<Double,Double>(); // List1 :  param1=frequency, param2=magnitude
-    public LinkedHashMap<String, LinkedHashMap<Double, Double>> timeFreqMagn= new LinkedHashMap<String,LinkedHashMap<Double, Double>>(); // List2 : param1=time, param2=list1
-
-    float framedSignal[][];
-    ArrayList<ArrayList<Complex>> magnitude;
+    float framedSignal[][];         // 切分之后的framedSignal
+    ArrayList<ArrayList<Complex>> magnitude;            // rfft 之后得到的幅度值
+    ArrayList<ArrayList<Double>> xdb;                   // 计算 amplitude_to_db 的结果
 
     void addWinfun() {
         for(int i=0;i<framedSignal.length;i++) {
@@ -57,36 +55,34 @@ public class STFT {
         return magnitude;
     }
 
-    Complex AverageMagnitude() {
-        Complex ret = new Complex(0,0);
-        int len = magnitude.size() * magnitude.get(0).size();
-        for(int i=0;i<magnitude.size();i++) {
-            for(int j=0;j<magnitude.get(i).size();j++) {
-                ret.plus(magnitude.get(i).get(j));
+    double AverageXdb() {
+        double ret = 0;
+        int len = xdb.size() * xdb.get(0).size();
+        for(int i=0;i<xdb.size();i++) {
+            for(int j=0;j<xdb.get(i).size();j++) {
+                ret += xdb.get(i).get(j);
             }
         }
-        return new Complex(ret.re()/len, ret.im()/len);
+        return ret;
     }
 
-    double StdVariationMagnitude() {
-        int len = magnitude.size() * magnitude.get(0).size();
-        Complex avg = AverageMagnitude();
-        Complex sum = avg.times(len);
+    double StdVariantXdb() {
+        int len = xdb.size() * xdb.get(0).size();
+        double avg = AverageXdb();
         double dVar = 0;
-        for(int i=0;i<magnitude.size();i++) {
-            for(int j=0;j<magnitude.get(i).size();j++) {
-                Complex xi = magnitude.get(i).get(j);
-                dVar += xi.minus(avg).abs();
+        for(int i=0;i<xdb.size();i++) {
+            for(int j=0;j<xdb.get(i).size();j++) {
+                double xi = xdb.get(i).get(j);
+                dVar += (xi - avg) * (xi - avg);
             }
         }
         return Math.sqrt(dVar/len);
     }
 
     ArrayList calculateFeature3(boolean normalized) {
-        ArrayList<ArrayList<Double>> xdb = new ArrayList<>(amplitude_to_db());      // Matrix
-        Complex complexAvg = AverageMagnitude();
-        double avg = complexAvg.abs();
-        double std = StdVariationMagnitude();
+        xdb = new ArrayList<>(amplitude_to_db());      // Matrix
+        double avg = AverageXdb();
+        double std = StdVariantXdb();
         if(normalized) {
             for(int i=0;i<xdb.size();i++) {
                 for (int j=0;i<xdb.get(j).size();j++) {

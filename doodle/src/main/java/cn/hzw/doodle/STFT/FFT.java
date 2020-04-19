@@ -47,7 +47,7 @@ public class FFT {
             trunc[i] = x[i];
         }
         Complex[] res = this.fft(trunc);
-        Complex[] ret = new Complex[NFFT/2+1]
+        Complex[] ret = new Complex[NFFT/2+1];
 
         assert res.length == NFFT;
 

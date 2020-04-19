@@ -46,9 +46,9 @@ public class MathView extends View {
 
     }
 
-    byte[] mydata = new byte[640];
+    float[] mydata = new float[640];
 
-    public void setData(byte[] data) {
+    public void setData(float[] data) {
         mydata = data;
         invalidate();
     }
