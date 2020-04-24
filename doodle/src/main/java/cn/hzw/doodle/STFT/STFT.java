@@ -1,5 +1,7 @@
 package cn.hzw.doodle.STFT;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -13,11 +15,9 @@ import java.util.LinkedHashMap;
  */
 public class STFT {
 
-    public LinkedHashMap<Double,Double> freqMagn= new LinkedHashMap<Double,Double>(); // List1 :  param1=frequency, param2=magnitude
-    public LinkedHashMap<String, LinkedHashMap<Double, Double>> timeFreqMagn= new LinkedHashMap<String,LinkedHashMap<Double, Double>>(); // List2 : param1=time, param2=list1
-
-    float framedSignal[][];
-    ArrayList<ArrayList<Complex>> magnitude;
+    float framedSignal[][];         // 切分之后的framedSignal
+    ArrayList<ArrayList<Complex>> magnitude;            // rfft 之后得到的幅度值
+    double[][] xdb;                   // 计算 amplitude_to_db 的结果
 
     void addWinfun() {
         for(int i=0;i<framedSignal.length;i++) {
@@ -25,7 +25,7 @@ public class STFT {
         }
     }
 
-    public ArrayList performStft(float[] signal, int sampleRate, double frameSize, double frameStride, int NFFT, boolean normalized) {
+    public double[][] performStft(Float[] signal, int sampleRate, double frameSize, double frameStride, int NFFT, boolean normalized) {
         int frameLength = (int)Math.round(frameSize *  sampleRate);
         int frameStep = (int)Math.round(frameStride * sampleRate);
         int signalLength = signal.length;
@@ -40,7 +40,7 @@ public class STFT {
 
         for(int i=0;i<numFrames;i++) {
             for(int j=0;j<frameLength;j++) {
-                framedSignal[i][j] = signal[frameStep * numFrames + j];
+                framedSignal[i][j] = padSignal[frameStep * numFrames + j];
             }
         }
 
@@ -53,95 +53,106 @@ public class STFT {
         assert magnitude.size() == numFrames;
         assert magnitude.get(0).size() == (NFFT / 2 - 1);
 
-        calculateFeature3(normalized);
-        return magnitude;
+        return calculateFeature3(normalized);
     }
 
-    Complex AverageMagnitude() {
-        Complex ret = new Complex(0,0);
-        int len = magnitude.size() * magnitude.get(0).size();
-        for(int i=0;i<magnitude.size();i++) {
-            for(int j=0;j<magnitude.get(i).size();j++) {
-                ret.plus(magnitude.get(i).get(j));
+    double AverageXdb() {
+        double ret = 0;
+        for(int i=0;i<xdb.length;i++) {
+            for(int j=0;j<xdb[i].length;j++) {
+                ret += xdb[i][j];
             }
         }
-        return new Complex(ret.re()/len, ret.im()/len);
+        return ret;
     }
 
-    double StdVariationMagnitude() {
-        int len = magnitude.size() * magnitude.get(0).size();
-        Complex avg = AverageMagnitude();
-        Complex sum = avg.times(len);
+    double StdVariantXdb() {
+        int len = xdb.length * xdb[0].length;
+        double avg = AverageXdb();
         double dVar = 0;
-        for(int i=0;i<magnitude.size();i++) {
-            for(int j=0;j<magnitude.get(i).size();j++) {
-                Complex xi = magnitude.get(i).get(j);
-                dVar += xi.minus(avg).abs();
+        for(int i=0;i<xdb.length;i++) {
+            for(int j=0;j<xdb[i].length;j++) {
+                double xi = xdb[i][j];
+                dVar += (xi - avg) * (xi - avg);
             }
         }
         return Math.sqrt(dVar/len);
     }
 
-    ArrayList calculateFeature3(boolean normalized) {
-        ArrayList<ArrayList<Double>> xdb = new ArrayList<>(amplitude_to_db());      // Matrix
-        Complex complexAvg = AverageMagnitude();
-        double avg = complexAvg.abs();
-        double std = StdVariationMagnitude();
+    public double[][] calculateFeature3(boolean normalized) {
+        int max_feature_len = 256;
+        amplitude_to_db();      // Matrix
+        double avg = AverageXdb();
+        double std = StdVariantXdb();
+
+//        if(normalized) {
+//            for(int i=0;i<xdb.length;i++) {
+//                for (int j = 0; j < xdb[i].length; j++) {
+//                    double xi = (xdb[i][j] - avg) / std;
+//                    xdb[i][j] = xi;
+//                }
+//            }
+//        }
+
+
+        double[][] ret = new double[max_feature_len][xdb[0].length];
         if(normalized) {
-            for(int i=0;i<xdb.size();i++) {
-                for (int j=0;i<xdb.get(j).size();j++) {
-                    double xi = (xdb.get(i).get(j) - avg) / std;
-                    xdb.get(i).set(j, xi);
+            for(int i=0;i<Math.min(max_feature_len, xdb.length);i++) {
+                for (int j=0;j<xdb[i].length;j++) {
+                    double xi = (xdb[i][j] - avg) / std;
+                    ret[i][j] = xi;
+                }
+            }
+            for (int i=xdb.length; i<max_feature_len; i++) {
+                for (int j=0; j<xdb[0].length; j++) {
+                    ret[i][j] = 0;
                 }
             }
         }
-        ArrayList<ArrayList<Double>> ret = new ArrayList<>();
+//        double[][] ret = new double[xdb[0].length][xdb.length];
         // transpose
-        for(int i=0;i<xdb.get(0).size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
-            for(int j=0;j<xdb.size();j++) {
-                buffer.add(xdb.get(j).get(i));
-            }
-            ret.add(new ArrayList<Double>(buffer));
-        }
+//        for(int i=0;i<xdb[0].length;i++) {
+//            for(int j=0;j<xdb.length;j++) {
+//                ret[i][j] = xdb[j][i];
+//            }
+//        }
 
         return ret;
     }
 
-    ArrayList amplitude_to_db() {
+    void amplitude_to_db() {
         double amin = 1E-10;
         double topDb = 80.0;
 
-        ArrayList<ArrayList<Double>> squareMagnitude = new ArrayList<>();
+        xdb = new double[magnitude.size()][magnitude.get(0).size()];
+
+
+        double[][] squareMagnitude = new double[magnitude.size()][magnitude.get(0).size()];
 
         for(int i=0;i<magnitude.size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
             for(int j=0;j<magnitude.get(0).size();j++) {
-                buffer.add(magnitude.get(i).get(i).square());
+                squareMagnitude[i][j] = magnitude.get(i).get(j).square();
             }
-            squareMagnitude.add(new ArrayList<Double>(buffer));
         }
 
-        ArrayList<ArrayList<Double>> logSpec = new ArrayList<>();
+        double[][] logSpec = new double[magnitude.size()][magnitude.get(0).size()];
         double maxSpec = 0;
         for(int i=0;i<magnitude.size();i++) {
-            ArrayList<Double> buffer = new ArrayList<>();
             for(int j=0;j<magnitude.get(0).size();j++) {
-                double d = 10 * Math.log10(Math.max(amin, squareMagnitude.get(i).get(j)));
-                d -= 10 * Math.log10(Math.max(amin, squareMagnitude.get(i).get(j)));
-                buffer.add(d);
+                double d = 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
+                d -= 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
+                logSpec[i][j] = d;
                 maxSpec = Math.max(maxSpec, d);
             }
-            logSpec.add(new ArrayList<Double>(buffer));
         }
 
         for(int i=0;i<magnitude.size();i++) {
             for(int j=0;j>magnitude.get(0).size();j++) {
-                logSpec.get(i).set(j, Math.max(logSpec.get(i).get(j), maxSpec - topDb));
+                logSpec[i][j] = Math.max(logSpec[i][j], maxSpec - topDb);
             }
         }
 
-        return logSpec;
+        xdb = logSpec;
     }
 
     /**

@@ -20,6 +20,7 @@ import android.os.Looper;
 import android.os.Message;
 import android.os.PersistableBundle;
 import android.os.Process;
+import android.support.annotation.RequiresApi;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.KeyEvent;
@@ -38,9 +39,12 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.nio.MappedByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +53,7 @@ import cn.forward.androids.utils.ImageUtils;
 import cn.forward.androids.utils.LogUtil;
 import cn.forward.androids.utils.StatusBarUtil;
 import cn.forward.androids.utils.Util;
+import cn.hzw.doodle.STFT.STFT;
 import cn.hzw.doodle.core.IDoodle;
 import cn.hzw.doodle.core.IDoodleColor;
 import cn.hzw.doodle.core.IDoodleItemListener;
@@ -166,6 +171,7 @@ public class DoodleActivity extends Activity {
     }
 
     @Override
+    @RequiresApi(23)
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         StatusBarUtil.setStatusBarTranslucent(this, true, false);
@@ -784,19 +790,20 @@ public class DoodleActivity extends Activity {
     }
 
     private static final int SAMPLE_RATE = 16000;
-    private static final int BUFFER_SIZE = 640;
+    private static final int BUFFER_SIZE = 800;
     public AudioRecord audioRecord;
     private Thread recordThread;
     public MathView mathView;
 
     private int mAudioSampleRate = SAMPLE_RATE;
     private int mAudioSource = MediaRecorder.AudioSource.MIC;
-    private int mAudioFormat = AudioFormat.ENCODING_PCM_16BIT;
+    private int mAudioFormat = AudioFormat.ENCODING_PCM_FLOAT;
     private int mAudioChannel = AudioFormat.CHANNEL_IN_MONO;
 
     private volatile boolean isQueryLog;
     private volatile boolean isStartRecord = false;
 
+    @RequiresApi(23)
     public void startRecord() {
 
         stopRecord();
@@ -840,13 +847,10 @@ public class DoodleActivity extends Activity {
                 isQueryLog = true;
                 while (isStartRecord) {
                     try {
-                        byte[] buffer = new byte[BUFFER_SIZE];
-                        int readBytes = audioRecord.read(buffer, 0, buffer.length);
+                        float[] buffer = new float[BUFFER_SIZE];
+                        int readBytes = audioRecord.read(buffer, 0, buffer.length, AudioRecord.READ_NON_BLOCKING);
                         if (readBytes > 0) {
                             ProcessData(buffer);
-                            Message msg = new Message();
-                            msg.obj = buffer;
-                            handler.sendMessage(msg);
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -871,17 +875,13 @@ public class DoodleActivity extends Activity {
         recordThread.start();
     }
 
+    STFT stft = new STFT();
+
     public void stopRecord() {
         isStartRecord = false;
     }
 
-    public void ProcessData(byte[] data) {
-        if (tfLite == null) {
-            loadModel();
-        }
-        DisplayAudio(data);
 
-    }
 
     public byte[] mainBuffer;
 
@@ -929,13 +929,37 @@ public class DoodleActivity extends Activity {
 
     }
 
-    public void DisplayAudio(byte[] data) {
-        String s = "Displayed data: ";
-        for(int i=0;i<data.length && i<10;i++) {
-            s = s + " " + data[i];
+    List<Float> audioData = new ArrayList();
+    public void ProcessData(float[] data) {
+        if (tfLite == null) {
+            loadModel();
         }
-        Log.d("AudioData", s);
-        return;
+        String s = "";
+        for(int i=0;i<data.length;i++) {
+            s += data[i] + ", ";
+            audioData.add(data[i]);
+        }
+        if (audioData.size() > 32000) audioData.clear();
+        double frameSize = 0.025;
+        Float[] arraydata = (audioData.toArray(new Float[0]));
+        double[][] d = stft.performStft(arraydata, SAMPLE_RATE, frameSize, 0.01, 254, true);
+        int BYTE_SIZE_OF_FLOAT = 4;
+        ByteBuffer input = ByteBuffer.allocateDirect(BYTE_SIZE_OF_FLOAT*1*256*128);
+        System.out.println("d: "+d.length + "," + d[0].length);
+        for (int i=0; i<128; i++) {
+            System.out.print(d[0][i]+",");
+        }
+
+        System.out.println("\n============");
+        for (int i=0; i<d.length; i++) {
+            for (int j=0; j<d[i].length; j++) {
+                input.putFloat((float)(d[i][j]));
+            }
+        }
+//        ByteBuffer output = ByteBuffer.allocateDirect(BYTE_SIZE_OF_FLOAT*1*1)；
+        long[] output = new long[1];
+        tfLite.run(input, output);
+        System.out.println("predict result:" + output[0]);
     }
 
     /**
