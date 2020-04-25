@@ -62,14 +62,6 @@ public class STFT {
             magnitude.add(calculateFFT(framedSignal[i], frameLength, NFFT));
         }
 
-        /*for(int i=0;i<numFrames;i++) {
-            String s = "";
-            for(int j=0;j<magnitude.get(i).size();j++) {
-                s += magnitude.get(i).get(j).toString() + ", ";
-            }
-            // Log.e("--------", s);
-        }*/
-
         assert magnitude.size() == numFrames;
         assert magnitude.get(0).size() == (NFFT / 2 - 1);
 
@@ -116,18 +108,6 @@ public class STFT {
     }
 
     public double[][] calculateFeature3(boolean normalized) {
-
-        int l = magnitude.size();
-        int w = magnitude.get(0).size();
-        magnitude.clear();
-        for(int i=0;i<l;i++) {
-            ArrayList<Complex> arr = new ArrayList<>();
-            for(int j=0;j<w;j++) {
-                arr.add(new Complex(i, 0));
-            }
-            magnitude.add(arr);
-        }
-
         amplitude_to_db();      // Matrix
 
         double avg = AverageXdb();

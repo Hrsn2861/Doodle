@@ -880,13 +880,13 @@ public class DoodleActivity extends Activity {
         float[] fdata = new float[data.length];
         for(int i=0;i<data.length;i++) {
             s += (data[i]) + ", ";
-            fdata[i] = i;
+            fdata[i] = (float)(data[i]);
         }
         assert fdata.length == BUFFER_SIZE;
         double frameSize = 0.02;
         double result[][] = stft.performStft(fdata, SAMPLE_RATE, frameSize, 0.01, 254, true);
-        //for(int i=0;i<result.length;i++)
-        //    Log.e(TAG, Arrays.toString(result[i]));
+        // for(int i=0;i<result.length;i++)
+        //     Log.e(TAG, Arrays.toString(result[i]));
     }
 
     /**
