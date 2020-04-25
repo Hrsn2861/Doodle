@@ -5,6 +5,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 
@@ -29,7 +30,7 @@ public class STFT {
         int frameLength = (int)Math.round(frameSize *  sampleRate);
         int frameStep = (int)Math.round(frameStride * sampleRate);
         int signalLength = signal.length;
-        int numFrames = 1 + (int)(Math.ceil((float)(Math.abs(signalLength - frameLength)) / frameStep));
+        int numFrames = (int)Math.floor(((double)(signalLength))/(double)(frameStep))+1;
 
         int padLength = (int)(numFrames * frameStep + frameLength);
         float[] padSignal = new float[padLength];
@@ -40,7 +41,7 @@ public class STFT {
 
         for(int i=0;i<numFrames;i++) {
             for(int j=0;j<frameLength;j++) {
-                framedSignal[i][j] = padSignal[frameStep * numFrames + j];
+                framedSignal[i][j] = padSignal[frameStep * i + j];
             }
         }
 
@@ -48,6 +49,14 @@ public class STFT {
 
         for(int i=0;i<numFrames;i++) {
             magnitude.add(calculateFFT(framedSignal[i], frameLength, NFFT));
+        }
+
+        for(int i=0;i<numFrames;i++) {
+            String s = "";
+            for(int j=0;j<magnitude.get(i).size();j++) {
+                s += magnitude.get(i).get(j).toString() + ", ";
+            }
+            // Log.e("--------", s);
         }
 
         assert magnitude.size() == numFrames;
@@ -81,6 +90,8 @@ public class STFT {
 
     public double[][] calculateFeature3(boolean normalized) {
         amplitude_to_db();      // Matrix
+        for(int i=0;i<xdb.length;i++)
+            Log.e("+++++++++++", Arrays.toString(xdb[i]));
         double avg = AverageXdb();
         double std = StdVariantXdb();
         if(normalized) {
@@ -112,16 +123,17 @@ public class STFT {
 
         for(int i=0;i<magnitude.size();i++) {
             for(int j=0;j<magnitude.get(0).size();j++) {
-                squareMagnitude[i][j] = magnitude.get(i).get(j).square();
+                squareMagnitude[i][j] = Math.pow(magnitude.get(i).get(j).abs(), 2);
             }
         }
 
+        // below is power_to_db
         double[][] logSpec = new double[magnitude.size()][magnitude.get(0).size()];
         double maxSpec = 0;
         for(int i=0;i<magnitude.size();i++) {
             for(int j=0;j<magnitude.get(0).size();j++) {
                 double d = 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
-                d -= 10 * Math.log10(Math.max(amin, squareMagnitude[i][j]));
+                d -= 10 * Math.log10(Math.max(amin, 1));            // ref_value = 1 ?
                 logSpec[i][j] = d;
                 maxSpec = Math.max(maxSpec, d);
             }

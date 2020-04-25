@@ -35,6 +35,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.lang.reflect.Array;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -790,7 +791,7 @@ public class DoodleActivity extends Activity {
 
     private int mAudioSampleRate = SAMPLE_RATE;
     private int mAudioSource = MediaRecorder.AudioSource.MIC;
-    private int mAudioFormat = AudioFormat.ENCODING_PCM_FLOAT;
+    private int mAudioFormat = AudioFormat.ENCODING_PCM_16BIT;
     private int mAudioChannel = AudioFormat.CHANNEL_IN_MONO;
 
     private volatile boolean isQueryLog;
@@ -814,7 +815,7 @@ public class DoodleActivity extends Activity {
         final int buffersize = audioRecord.getMinBufferSize(mAudioSampleRate, mAudioChannel, mAudioFormat);
 
         try {
-            audioRecord = new AudioRecord(mAudioSource, mAudioSampleRate, mAudioChannel, mAudioFormat, buffersize * 10);
+            audioRecord = new AudioRecord(mAudioSource, mAudioSampleRate, mAudioChannel, mAudioFormat, buffersize);
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -840,7 +841,7 @@ public class DoodleActivity extends Activity {
                 isQueryLog = true;
                 while (isStartRecord) {
                     try {
-                        float[] buffer = new float[BUFFER_SIZE];
+                        short[] buffer = new short[BUFFER_SIZE];
                         int readBytes = audioRecord.read(buffer, 0, buffer.length, AudioRecord.READ_NON_BLOCKING);
                         if (readBytes > 0) {
                             ProcessData(buffer);
@@ -874,13 +875,18 @@ public class DoodleActivity extends Activity {
         isStartRecord = false;
     }
 
-    public void ProcessData(float[] data) {
+    public void ProcessData(short[] data) {
         String s = "";
+        float[] fdata = new float[data.length];
         for(int i=0;i<data.length;i++) {
-            s += data[i] + ", ";
+            s += (data[i]) + ", ";
+            fdata[i] = i;
         }
-        double frameSize = 0.025;
-        stft.performStft(data, SAMPLE_RATE, frameSize, 0.01, 254, true);
+        assert fdata.length == BUFFER_SIZE;
+        double frameSize = 0.02;
+        double result[][] = stft.performStft(fdata, SAMPLE_RATE, frameSize, 0.01, 254, true);
+        // for(int i=0;i<result.length;i++)
+        //     Log.e(TAG, Arrays.toString(result[i]));
     }
 
     /**

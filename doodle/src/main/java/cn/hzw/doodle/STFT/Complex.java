@@ -38,8 +38,8 @@ public class Complex {
         return Math.hypot(re, im);
     }
 
-    public double square() {
-        return Math.pow(re,2) + Math.pow(im,2);
+    public Complex square() {
+        return new Complex(re*re-im*im, 2*re*im);
     }
 
     /**
