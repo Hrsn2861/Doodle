@@ -51,11 +51,14 @@ public class FFT {
         }
         int LENGTH = 256;
         Complex[] trunc = new Complex[LENGTH];
-        trunc[0] = new Complex(0, 0);
-        trunc[255] = new Complex(0, 0);
+
         for(int i=0;i<NFFT;i++) {
             trunc[i+1] = new Complex(x[i].re(), x[i].im());
         }
+
+        trunc[0] = new Complex(trunc[1].re(), trunc[1].im());
+        trunc[255] = new Complex(trunc[254].re(), trunc[254].im());
+
         Complex[] res = this.fft(trunc);
         Complex[] ret = new Complex[NFFT/2+1];
 

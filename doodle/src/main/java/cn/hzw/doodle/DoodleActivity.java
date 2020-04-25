@@ -885,8 +885,8 @@ public class DoodleActivity extends Activity {
         assert fdata.length == BUFFER_SIZE;
         double frameSize = 0.02;
         double result[][] = stft.performStft(fdata, SAMPLE_RATE, frameSize, 0.01, 254, true);
-        // for(int i=0;i<result.length;i++)
-        //     Log.e(TAG, Arrays.toString(result[i]));
+        //for(int i=0;i<result.length;i++)
+        //    Log.e(TAG, Arrays.toString(result[i]));
     }
 
     /**

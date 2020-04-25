@@ -28,13 +28,24 @@ public class STFT {
 
     public double[][] performStft(float[] signal, int sampleRate, double frameSize, double frameStride, int NFFT, boolean normalized) {
         int frameLength = (int)Math.round(frameSize *  sampleRate);
+        frameLength = 254;
         int frameStep = (int)Math.round(frameStride * sampleRate);
         int signalLength = signal.length;
         int numFrames = (int)Math.floor(((double)(signalLength))/(double)(frameStep))+1;
 
-        int padLength = (int)(numFrames * frameStep + frameLength);
+        int padLength = signalLength + NFFT;
+        assert NFFT % 2 == 0;
+
         float[] padSignal = new float[padLength];
-        for(int i=0;i<signalLength;i++) { padSignal[i] = signal[i]; }           // pad zeros to the signal
+
+        for(int i=0;i<signalLength;i++) {
+            padSignal[i+NFFT/2] = signal[i];
+        }
+
+        for(int i=0;i<NFFT/2;i++) {
+            padSignal[i] = padSignal[NFFT-i];
+            padSignal[signalLength+NFFT/2+i] = padSignal[signalLength+NFFT/2-i-2];
+        }
 
         framedSignal = new float[numFrames][frameLength];
         magnitude = new ArrayList<ArrayList<Complex>>();
@@ -51,13 +62,13 @@ public class STFT {
             magnitude.add(calculateFFT(framedSignal[i], frameLength, NFFT));
         }
 
-        for(int i=0;i<numFrames;i++) {
+        /*for(int i=0;i<numFrames;i++) {
             String s = "";
             for(int j=0;j<magnitude.get(i).size();j++) {
                 s += magnitude.get(i).get(j).toString() + ", ";
             }
             // Log.e("--------", s);
-        }
+        }*/
 
         assert magnitude.size() == numFrames;
         assert magnitude.get(0).size() == (NFFT / 2 - 1);
@@ -72,7 +83,7 @@ public class STFT {
                 ret += xdb[i][j];
             }
         }
-        return ret;
+        return ret / xdb.length / xdb[0].length;
     }
 
     double StdVariantXdb() {
@@ -88,20 +99,49 @@ public class STFT {
         return Math.sqrt(dVar/len);
     }
 
+    public void Dispaly(double[][] arr) {
+        for(int i=0;i<arr.length;i++) {
+            Log.e("=========", Arrays.toString(arr[i]));
+        }
+    }
+
+    public void DisplayMagnitude() {
+        for(int i=0;i<magnitude.size();i++) {
+            String s = "";
+            for(int j=0;j<magnitude.get(0).size();j++) {
+                s += magnitude.get(i).get(j).toString()+", ";
+            }
+            Log.e("||||||||||", s);
+        }
+    }
+
     public double[][] calculateFeature3(boolean normalized) {
+
+        int l = magnitude.size();
+        int w = magnitude.get(0).size();
+        magnitude.clear();
+        for(int i=0;i<l;i++) {
+            ArrayList<Complex> arr = new ArrayList<>();
+            for(int j=0;j<w;j++) {
+                arr.add(new Complex(i, 0));
+            }
+            magnitude.add(arr);
+        }
+
         amplitude_to_db();      // Matrix
-        for(int i=0;i<xdb.length;i++)
-            Log.e("+++++++++++", Arrays.toString(xdb[i]));
+
         double avg = AverageXdb();
         double std = StdVariantXdb();
+
         if(normalized) {
             for(int i=0;i<xdb.length;i++) {
                 for (int j=0;j<xdb[i].length;j++) {
-                    double xi = (xdb[i][j] - avg) / std;
+                    double xi = xdb[i][j] - avg / std;
                     xdb[i][j] = xi;
                 }
             }
         }
+
         double[][] ret = new double[xdb[0].length][xdb.length];
         // transpose
         for(int i=0;i<xdb[0].length;i++) {
@@ -140,7 +180,7 @@ public class STFT {
         }
 
         for(int i=0;i<magnitude.size();i++) {
-            for(int j=0;j>magnitude.get(0).size();j++) {
+            for(int j=0;j<magnitude.get(0).size();j++) {
                 logSpec[i][j] = Math.max(logSpec[i][j], maxSpec - topDb);
             }
         }
