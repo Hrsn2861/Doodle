@@ -4,8 +4,6 @@ import android.animation.ValueAnimator;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.content.res.AssetFileDescriptor;
-import android.content.res.AssetManager;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.ColorDrawable;
@@ -36,17 +34,10 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
-<<<<<<< HEAD
 import java.lang.reflect.Array;
-=======
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.MappedByteBuffer;
-import java.nio.channels.FileChannel;
->>>>>>> 18b4ab17bab9500c4f96f811e456e21f7f8085be
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
@@ -68,7 +59,6 @@ import cn.hzw.doodle.core.IDoodleTouchDetector;
 import cn.hzw.doodle.dialog.ColorPickerDialog;
 import cn.hzw.doodle.dialog.DialogController;
 import cn.hzw.doodle.imagepicker.ImageSelectorView;
-import org.tensorflow.lite.Interpreter;
 
 /**
  * 涂鸦界面，根据DoodleView的接口，提供页面交互
@@ -885,67 +875,10 @@ public class DoodleActivity extends Activity {
         isStartRecord = false;
     }
 
-<<<<<<< HEAD
     public void ProcessData(short[] data) {
-=======
-
-
-    public byte[] mainBuffer;
-
-    Handler handler = new Handler() {
-        public void handleMessage(Message msg) {
-            byte[] displaydata = new byte[8];
-            byte[] data = (byte[])(msg.obj);
-            for(int i=0;i<8;i++)
-                displaydata[i] = data[i];
-            mainBuffer = data;
-            DrawData(data);
-        }
-    };
-
-    private static final String MODEL_FILENAME = "file:///android_asset/android.tflite";
-    private static MappedByteBuffer loadModelFile(AssetManager assets, String modelFilename)
-            throws IOException {
-        AssetFileDescriptor fileDescriptor = assets.openFd(modelFilename);
-        FileInputStream inputStream = new FileInputStream(fileDescriptor.getFileDescriptor());
-        FileChannel fileChannel = inputStream.getChannel();
-        long startOffset = fileDescriptor.getStartOffset();
-        long declaredLength = fileDescriptor.getDeclaredLength();
-        return fileChannel.map(FileChannel.MapMode.READ_ONLY, startOffset, declaredLength);
-    }
-    Interpreter tfLite = null;
-    public void loadModel() {
-        String actualModelFilename = MODEL_FILENAME.split("file:///android_asset/", -1)[1];
-        try {
-            tfLite = new Interpreter(loadModelFile(getAssets(), actualModelFilename));
-        } catch (Exception e) {
-            throw new RuntimeException(e);
-        }
-    }
-
-    public byte[] getMainBuffer() {
-        return mainBuffer;
-    }
-
-    public void DrawData(byte[] data) {
-        // mathView.setData(data);
-        // DisplayAudio(data);
-    }
-
-    public void ChangedParams() {
-
-    }
-
-    List<Float> audioData = new ArrayList();
-    public void ProcessData(float[] data) {
-        if (tfLite == null) {
-            loadModel();
-        }
->>>>>>> 18b4ab17bab9500c4f96f811e456e21f7f8085be
         String s = "";
         float[] fdata = new float[data.length];
         for(int i=0;i<data.length;i++) {
-<<<<<<< HEAD
             s += (data[i]) + ", ";
             fdata[i] = i;
         }
@@ -954,32 +887,6 @@ public class DoodleActivity extends Activity {
         double result[][] = stft.performStft(fdata, SAMPLE_RATE, frameSize, 0.01, 254, true);
         // for(int i=0;i<result.length;i++)
         //     Log.e(TAG, Arrays.toString(result[i]));
-=======
-            s += data[i] + ", ";
-            audioData.add(data[i]);
-        }
-        if (audioData.size() > 32000) audioData.clear();
-        double frameSize = 0.025;
-        Float[] arraydata = (audioData.toArray(new Float[0]));
-        double[][] d = stft.performStft(arraydata, SAMPLE_RATE, frameSize, 0.01, 254, true);
-        int BYTE_SIZE_OF_FLOAT = 4;
-        ByteBuffer input = ByteBuffer.allocateDirect(BYTE_SIZE_OF_FLOAT*1*256*128);
-        System.out.println("d: "+d.length + "," + d[0].length);
-        for (int i=0; i<128; i++) {
-            System.out.print(d[0][i]+",");
-        }
-
-        System.out.println("\n============");
-        for (int i=0; i<d.length; i++) {
-            for (int j=0; j<d[i].length; j++) {
-                input.putFloat((float)(d[i][j]));
-            }
-        }
-//        ByteBuffer output = ByteBuffer.allocateDirect(BYTE_SIZE_OF_FLOAT*1*1)；
-        long[] output = new long[1];
-        tfLite.run(input, output);
-        System.out.println("predict result:" + output[0]);
->>>>>>> 18b4ab17bab9500c4f96f811e456e21f7f8085be
     }
 
     /**
